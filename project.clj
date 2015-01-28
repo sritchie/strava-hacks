@@ -8,8 +8,7 @@
   :dependencies [[org.clojure/clojure "1.7.0-alpha5"]
                  [org.clojure/clojurescript "0.0-2727"]
                  [prismatic/schema "0.3.1"]
-
-                 ;; Mostly here for clj-only testing.
+                 ;; Here for clj-only testing.
                  [cheshire "5.3.1"]]
   :cljsbuild
   {:builds

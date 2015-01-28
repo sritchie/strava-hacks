@@ -1,5 +1,8 @@
 (ns racehub.strava.core
-  (:require [schema.core :as s :include-macros true]))
+  (:require [cheshire.core :as json]
+            [clojure.java.io :as io]
+            [clojure.string :as string]
+            [schema.core :as s :include-macros true]))
 
 ;; Strava Schemas
 ;;
@@ -146,3 +149,37 @@
        (recompute-stats
         (update i :by_day_of_week
                 #(map-values swap-activities %))))))
+
+;; ## Parsing
+
+(s/defn shitty-regex :- (s/maybe s/Str)
+  "Returns nil if there was no match, the new string if there
+  was. This is a shameful version of what SHOULD be a regex."
+  [f :- (s/=> s/Str s/Str) s :- s/Str]
+  (let [marker "intervals.reset(["
+        prefix-idx (.indexOf s marker)]
+    (when (not= prefix-idx -1)
+      (let [prefix-idx (+ prefix-idx (count marker))
+            ^String prefix (.substring s 0 (dec prefix-idx))
+            ^String rest (.substring s prefix-idx)
+            match-idx (.indexOf rest "])")
+            ^String match (.substring rest 0 match-idx)
+            ^String suffix (.substring rest (inc match-idx))]
+        (str prefix (f (str "[" match "]")) suffix)))))
+
+(s/defn update-intervals :- (s/maybe s/Str)
+  "Takes a string representing the particular strava script and runs
+  the supplied function on the intervals."
+  [f :- (s/=> [Interval] [Interval]) s :- s/Str]
+  (letfn [(twiddle [match]
+            (let [intervals (json/parse-string match keyword)
+                  updated (f intervals)]
+              (json/generate-string updated)))]
+    (shitty-regex twiddle s)))
+
+(comment
+  "This slurps up the example and outputs a new example."
+  (->> (io/resource "data.js")
+       (slurp)
+       (update-intervals (partial map enable))
+       (spit (io/file "/Users/sritchie/result.js"))))
